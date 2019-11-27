@@ -47,7 +47,7 @@ from homeassistant.util.async_ import run_callback_threadsafe
 from homeassistant.util.logging import catch_log_exception
 
 # Loading the config flow file will register the flow
-from . import config_flow, discovery, server  # noqa pylint: disable=unused-import
+from . import config_flow, discovery, server  # noqa: F401 pylint: disable=unused-import
 from .const import (
     CONF_BROKER,
     CONF_DISCOVERY,
@@ -335,7 +335,6 @@ MQTT_PUBLISH_SCHEMA = vol.Schema(
 )
 
 
-# pylint: disable=invalid-name
 SubscribePayloadType = Union[str, bytes]  # Only bytes if encoding is None
 
 
