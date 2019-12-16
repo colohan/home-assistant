@@ -1,11 +1,12 @@
 """Component for interacting with a Lutron Caseta system."""
 import logging
 
+from pylutron_caseta.smartbridge import Smartbridge
 import voluptuous as vol
 
-import homeassistant.helpers.config_validation as cv
 from homeassistant.const import CONF_HOST
 from homeassistant.helpers import discovery
+import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import Entity
 
 _LOGGER = logging.getLogger(__name__)
@@ -32,12 +33,11 @@ CONFIG_SCHEMA = vol.Schema(
     extra=vol.ALLOW_EXTRA,
 )
 
-LUTRON_CASETA_COMPONENTS = ["light", "switch", "cover", "scene"]
+LUTRON_CASETA_COMPONENTS = ["light", "switch", "cover", "scene", "fan"]
 
 
 async def async_setup(hass, base_config):
     """Set up the Lutron component."""
-    from pylutron_caseta.smartbridge import Smartbridge
 
     config = base_config.get(DOMAIN)
     keyfile = hass.config.path(config[CONF_KEYFILE])

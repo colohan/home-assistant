@@ -5,7 +5,6 @@ omit =
     homeassistant/__main__.py
     homeassistant/helpers/signal.py
     homeassistant/helpers/typing.py
-    homeassistant/monkey_patch.py
     homeassistant/scripts/*.py
     homeassistant/util/async.py
 
@@ -62,6 +61,7 @@ omit =
     homeassistant/components/asterisk_cdr/mailbox.py
     homeassistant/components/asterisk_mbox/*
     homeassistant/components/asuswrt/device_tracker.py
+    homeassistant/components/aten_pe/*
     homeassistant/components/atome/*
     homeassistant/components/august/*
     homeassistant/components/aurora_abb_powerone/sensor.py
@@ -85,7 +85,7 @@ omit =
     homeassistant/components/bloomsky/*
     homeassistant/components/bluesound/*
     homeassistant/components/bluetooth_le_tracker/device_tracker.py
-    homeassistant/components/bluetooth_tracker/device_tracker.py
+    homeassistant/components/bluetooth_tracker/*
     homeassistant/components/bme280/sensor.py
     homeassistant/components/bme680/sensor.py
     homeassistant/components/bmw_connected_drive/*
@@ -93,6 +93,7 @@ omit =
     homeassistant/components/bom/sensor.py
     homeassistant/components/bom/weather.py
     homeassistant/components/braviatv/media_player.py
+    homeassistant/components/broadlink/remote.py
     homeassistant/components/broadlink/sensor.py
     homeassistant/components/broadlink/switch.py
     homeassistant/components/brottsplatskartan/sensor.py
@@ -163,6 +164,7 @@ omit =
     homeassistant/components/doorbird/*
     homeassistant/components/dovado/*
     homeassistant/components/downloader/*
+    homeassistant/components/dsmr_reader/*
     homeassistant/components/dte_energy_bridge/sensor.py
     homeassistant/components/dublin_bus_transport/sensor.py
     homeassistant/components/duke_energy/sensor.py
@@ -316,7 +318,9 @@ omit =
     homeassistant/components/iaqualink/light.py
     homeassistant/components/iaqualink/sensor.py
     homeassistant/components/iaqualink/switch.py
-    homeassistant/components/icloud/*
+    homeassistant/components/icloud/__init__.py
+    homeassistant/components/icloud/device_tracker.py
+    homeassistant/components/icloud/sensor.py
     homeassistant/components/izone/climate.py
     homeassistant/components/izone/discovery.py
     homeassistant/components/izone/__init__.py
@@ -329,6 +333,7 @@ omit =
     homeassistant/components/influxdb/sensor.py
     homeassistant/components/insteon/*
     homeassistant/components/incomfort/*
+    homeassistant/components/intesishome/*
     homeassistant/components/ios/*
     homeassistant/components/iota/*
     homeassistant/components/iperf3/*
@@ -607,6 +612,8 @@ omit =
     homeassistant/components/shodan/sensor.py
     homeassistant/components/sht31/sensor.py
     homeassistant/components/sigfox/sensor.py
+    homeassistant/components/signal_messenger/__init__.py
+    homeassistant/components/signal_messenger/notify.py
     homeassistant/components/simplepush/notify.py
     homeassistant/components/simplisafe/__init__.py
     homeassistant/components/simplisafe/alarm_control_panel.py
@@ -746,7 +753,6 @@ omit =
     homeassistant/components/velbus/switch.py
     homeassistant/components/velux/*
     homeassistant/components/venstar/climate.py
-    homeassistant/components/vera/*
     homeassistant/components/verisure/*
     homeassistant/components/versasense/*
     homeassistant/components/vesync/__init__.py
@@ -770,7 +776,6 @@ omit =
     homeassistant/components/waze_travel_time/sensor.py
     homeassistant/components/webostv/*
     homeassistant/components/wemo/*
-    homeassistant/components/wemo/fan.py
     homeassistant/components/whois/sensor.py
     homeassistant/components/wink/*
     homeassistant/components/wirelesstag/*

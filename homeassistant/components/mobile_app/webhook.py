@@ -4,7 +4,6 @@ import logging
 from aiohttp.web import HTTPBadRequest, Request, Response
 import voluptuous as vol
 
-from homeassistant.components.cloud import CloudNotAvailable, async_remote_ui_url
 from homeassistant.components.frontend import MANIFEST_JSON
 from homeassistant.components.zone.const import DOMAIN as ZONE_DOMAIN
 from homeassistant.const import (
@@ -191,10 +190,7 @@ async def handle_webhook(
 
         device_registry.async_get_or_create(
             config_entry_id=config_entry.entry_id,
-            identifiers={
-                (ATTR_DEVICE_ID, registration[ATTR_DEVICE_ID]),
-                (CONF_WEBHOOK_ID, registration[CONF_WEBHOOK_ID]),
-            },
+            identifiers={(DOMAIN, registration[ATTR_DEVICE_ID])},
             manufacturer=new_registration[ATTR_MANUFACTURER],
             model=new_registration[ATTR_MODEL],
             name=new_registration[ATTR_DEVICE_NAME],
@@ -311,8 +307,8 @@ async def handle_webhook(
             resp[CONF_CLOUDHOOK_URL] = registration[CONF_CLOUDHOOK_URL]
 
         try:
-            resp[CONF_REMOTE_UI_URL] = async_remote_ui_url(hass)
-        except CloudNotAvailable:
+            resp[CONF_REMOTE_UI_URL] = hass.components.cloud.async_remote_ui_url()
+        except hass.components.cloud.CloudNotAvailable:
             pass
 
         return webhook_response(resp, registration=registration, headers=headers)
