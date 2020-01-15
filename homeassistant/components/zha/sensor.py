@@ -12,9 +12,15 @@ from homeassistant.components.sensor import (
     DEVICE_CLASS_TEMPERATURE,
     DOMAIN,
 )
-from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT, POWER_WATT, TEMP_CELSIUS
+from homeassistant.const import (
+    ATTR_UNIT_OF_MEASUREMENT,
+    POWER_WATT,
+    STATE_UNKNOWN,
+    TEMP_CELSIUS,
+)
 from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.util.temperature import fahrenheit_to_celsius
 
 from .core.const import (
     CHANNEL_ELECTRICAL_MEASUREMENT,
@@ -30,7 +36,7 @@ from .core.const import (
     SIGNAL_STATE_ATTR,
     ZHA_DISCOVERY_NEW,
 )
-from .core.registries import SMARTTHINGS_HUMIDITY_CLUSTER, ZHA_ENTITIES, MatchRule
+from .core.registries import SMARTTHINGS_HUMIDITY_CLUSTER, ZHA_ENTITIES
 from .entity import ZhaEntity
 
 PARALLEL_UPDATES = 5
@@ -90,7 +96,8 @@ async def _async_setup_entities(
     for discovery_info in discovery_infos:
         entities.append(await make_sensor(discovery_info))
 
-    async_add_entities(entities, update_before_add=True)
+    if entities:
+        async_add_entities(entities, update_before_add=True)
 
 
 async def make_sensor(discovery_info):
@@ -159,7 +166,6 @@ class Sensor(ZhaEntity):
     def async_restore_last_state(self, last_state):
         """Restore previous state."""
         self._state = last_state.state
-        self._unit = last_state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
 
     @callback
     async def async_state_attr_provider(self):
@@ -175,7 +181,7 @@ class Sensor(ZhaEntity):
         return round(float(value * self._multiplier) / self._divisor)
 
 
-@STRICT_MATCH(MatchRule(channel_names={CHANNEL_POWER_CONFIGURATION}))
+@STRICT_MATCH(channel_names=CHANNEL_POWER_CONFIGURATION)
 class Battery(Sensor):
     """Battery sensor of power configuration cluster."""
 
@@ -203,7 +209,7 @@ class Battery(Sensor):
         return state_attrs
 
 
-@STRICT_MATCH(MatchRule(channel_names={CHANNEL_ELECTRICAL_MEASUREMENT}))
+@STRICT_MATCH(channel_names=CHANNEL_ELECTRICAL_MEASUREMENT)
 class ElectricalMeasurement(Sensor):
     """Active power measurement."""
 
@@ -221,8 +227,8 @@ class ElectricalMeasurement(Sensor):
         return round(value * self._channel.multiplier / self._channel.divisor)
 
 
-@STRICT_MATCH(MatchRule(generic_ids={CHANNEL_ST_HUMIDITY_CLUSTER}))
-@STRICT_MATCH(MatchRule(channel_names={CHANNEL_HUMIDITY}))
+@STRICT_MATCH(generic_ids=CHANNEL_ST_HUMIDITY_CLUSTER)
+@STRICT_MATCH(channel_names=CHANNEL_HUMIDITY)
 class Humidity(Sensor):
     """Humidity sensor."""
 
@@ -231,7 +237,7 @@ class Humidity(Sensor):
     _unit = "%"
 
 
-@STRICT_MATCH(MatchRule(channel_names={CHANNEL_ILLUMINANCE}))
+@STRICT_MATCH(channel_names=CHANNEL_ILLUMINANCE)
 class Illuminance(Sensor):
     """Illuminance Sensor."""
 
@@ -244,7 +250,7 @@ class Illuminance(Sensor):
         return round(pow(10, ((value - 1) / 10000)), 1)
 
 
-@STRICT_MATCH(MatchRule(channel_names={CHANNEL_SMARTENERGY_METERING}))
+@STRICT_MATCH(channel_names=CHANNEL_SMARTENERGY_METERING)
 class SmartEnergyMetering(Sensor):
     """Metering sensor."""
 
@@ -260,7 +266,7 @@ class SmartEnergyMetering(Sensor):
         return self._channel.unit_of_measurement
 
 
-@STRICT_MATCH(MatchRule(channel_names={CHANNEL_PRESSURE}))
+@STRICT_MATCH(channel_names=CHANNEL_PRESSURE)
 class Pressure(Sensor):
     """Pressure sensor."""
 
@@ -269,10 +275,21 @@ class Pressure(Sensor):
     _unit = "hPa"
 
 
-@STRICT_MATCH(MatchRule(channel_names={CHANNEL_TEMPERATURE}))
+@STRICT_MATCH(channel_names=CHANNEL_TEMPERATURE)
 class Temperature(Sensor):
     """Temperature Sensor."""
 
     _device_class = DEVICE_CLASS_TEMPERATURE
     _divisor = 100
     _unit = TEMP_CELSIUS
+
+    @callback
+    def async_restore_last_state(self, last_state):
+        """Restore previous state."""
+        if last_state.state == STATE_UNKNOWN:
+            return
+        if last_state.attributes.get(ATTR_UNIT_OF_MEASUREMENT) != TEMP_CELSIUS:
+            ftemp = float(last_state.state)
+            self._state = round(fahrenheit_to_celsius(ftemp), 1)
+            return
+        self._state = last_state.state
