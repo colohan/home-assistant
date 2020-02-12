@@ -217,7 +217,7 @@ class NetatmoSensor(Entity):
 
         if data is None:
             _LOGGER.info("No data found for %s (%s)", self.module_name, self._module_id)
-            _LOGGER.error("data: %s", self.netatmo_data.data)
+            _LOGGER.debug("data: %s", self.netatmo_data.data)
             self._state = None
             return
 
@@ -426,6 +426,11 @@ class NetatmoPublicSensor(Entity):
     def unit_of_measurement(self):
         """Return the unit of measurement of this entity."""
         return self._unit_of_measurement
+
+    @property
+    def available(self):
+        """Return True if entity is available."""
+        return bool(self._state)
 
     def update(self):
         """Get the latest data from Netatmo API and updates the states."""
