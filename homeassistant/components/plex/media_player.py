@@ -109,8 +109,10 @@ class PlexMediaPlayer(MediaPlayerDevice):
         self._is_player_active = False
         self._machine_identifier = device.machineIdentifier
         self._make = ""
+        self._device_platform = None
         self._device_product = None
         self._device_title = None
+        self._device_version = None
         self._name = None
         self._player_state = "idle"
         self._previous_volume_level = 1  # Used in fake muting
@@ -125,6 +127,7 @@ class PlexMediaPlayer(MediaPlayerDevice):
         self._media_content_type = None
         self._media_duration = None
         self._media_image_url = None
+        self._media_summary = None
         self._media_title = None
         self._media_position = None
         self._media_position_updated_at = None
@@ -166,6 +169,7 @@ class PlexMediaPlayer(MediaPlayerDevice):
         self._media_content_type = None
         self._media_duration = None
         self._media_image_url = None
+        self._media_summary = None
         self._media_title = None
         # Music
         self._media_album_artist = None
@@ -193,8 +197,10 @@ class PlexMediaPlayer(MediaPlayerDevice):
                 device_url = "127.0.0.1"
             if "127.0.0.1" in device_url:
                 self.device.proxyThroughServer()
+            self._device_platform = self.device.platform
             self._device_product = self.device.product
             self._device_title = self.device.title
+            self._device_version = self.device.version
             self._device_protocol_capabilities = self.device.protocolCapabilities
             self._player_state = self.device.state
 
@@ -212,8 +218,10 @@ class PlexMediaPlayer(MediaPlayerDevice):
             if session_device:
                 self._make = session_device.device or ""
                 self._player_state = session_device.state
+                self._device_platform = self._device_platform or session_device.platform
                 self._device_product = self._device_product or session_device.product
                 self._device_title = self._device_title or session_device.title
+                self._device_version = self._device_version or session_device.version
             else:
                 _LOGGER.warning("No player associated with active session")
 
@@ -236,7 +244,7 @@ class PlexMediaPlayer(MediaPlayerDevice):
             self._media_content_id = self.session.ratingKey
             self._media_content_rating = getattr(self.session, "contentRating", None)
 
-        name_parts = [self._device_product, self._device_title]
+        name_parts = [self._device_product, self._device_title or self._device_platform]
         if (self._device_product in COMMON_PLAYERS) and self.make:
             # Add more context in name for likely duplicates
             name_parts.append(self.make)
@@ -250,6 +258,7 @@ class PlexMediaPlayer(MediaPlayerDevice):
             self._session_type = self.session.type
             self._media_duration = int(self.session.duration / 1000)
             #  title (movie name, tv episode name, music song name)
+            self._media_summary = self.session.summary
             self._media_title = self.session.title
             # media type
             self._set_media_type()
@@ -266,7 +275,7 @@ class PlexMediaPlayer(MediaPlayerDevice):
         thumb_url = self.session.thumbUrl
         if (
             self.media_content_type is MEDIA_TYPE_TVSHOW
-            and not self.plex_server.use_episode_art
+            and not self.plex_server.option_use_episode_art
         ):
             thumb_url = self.session.url(self.session.grandparentThumb)
 
@@ -440,6 +449,11 @@ class PlexMediaPlayer(MediaPlayerDevice):
         return self._media_image_url
 
     @property
+    def media_summary(self):
+        """Return the summary of current playing media."""
+        return self._media_summary
+
+    @property
     def media_title(self):
         """Return the title of current playing media."""
         return self._media_title
@@ -468,7 +482,7 @@ class PlexMediaPlayer(MediaPlayerDevice):
     def supported_features(self):
         """Flag media player features that are supported."""
         # force show all controls
-        if self.plex_server.show_all_controls:
+        if self.plex_server.option_show_all_controls:
             return (
                 SUPPORT_PAUSE
                 | SUPPORT_PREVIOUS_TRACK
@@ -712,6 +726,22 @@ class PlexMediaPlayer(MediaPlayerDevice):
             "media_content_rating": self._media_content_rating,
             "session_username": self.username,
             "media_library_name": self._app_name,
+            "summary": self.media_summary,
         }
 
         return attr
+
+    @property
+    def device_info(self):
+        """Return a device description for device registry."""
+        if self.machine_identifier is None:
+            return None
+
+        return {
+            "identifiers": {(PLEX_DOMAIN, self.machine_identifier)},
+            "manufacturer": self._device_platform or "Plex",
+            "model": self._device_product or self.make,
+            "name": self.name,
+            "sw_version": self._device_version,
+            "via_device": (PLEX_DOMAIN, self.plex_server.machine_identifier),
+        }
