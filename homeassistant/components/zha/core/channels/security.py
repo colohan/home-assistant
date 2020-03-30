@@ -51,7 +51,7 @@ class IasWd(ZigbeeChannel):
         """Get the specified bit from the value."""
         return (value & (1 << bit)) != 0
 
-    async def squawk(
+    async def issue_squawk(
         self,
         mode=WARNING_DEVICE_SQUAWK_MODE_ARMED,
         strobe=WARNING_DEVICE_STROBE_YES,
@@ -76,7 +76,7 @@ class IasWd(ZigbeeChannel):
 
         await self.squawk(value)
 
-    async def start_warning(
+    async def issue_start_warning(
         self,
         mode=WARNING_DEVICE_MODE_EMERGENCY,
         strobe=WARNING_DEVICE_STROBE_YES,
@@ -124,7 +124,9 @@ class IASZoneChannel(ZigbeeChannel):
         """Handle commands received to this cluster."""
         if command_id == 0:
             state = args[0] & 3
-            self.async_send_signal(f"{self.unique_id}_{SIGNAL_ATTR_UPDATED}", state)
+            self.async_send_signal(
+                f"{self.unique_id}_{SIGNAL_ATTR_UPDATED}", 2, "zone_status", state
+            )
             self.debug("Updated alarm state: %s", state)
         elif command_id == 1:
             self.debug("Enroll requested")
@@ -165,10 +167,15 @@ class IASZoneChannel(ZigbeeChannel):
         """Handle attribute updates on this cluster."""
         if attrid == 2:
             value = value & 3
-            self.async_send_signal(f"{self.unique_id}_{SIGNAL_ATTR_UPDATED}", value)
+            self.async_send_signal(
+                f"{self.unique_id}_{SIGNAL_ATTR_UPDATED}",
+                attrid,
+                self.cluster.attributes.get(attrid, [attrid])[0],
+                value,
+            )
 
     async def async_initialize(self, from_cache):
         """Initialize channel."""
-        await self.get_attribute_value("zone_status", from_cache=from_cache)
-        await self.get_attribute_value("zone_state", from_cache=from_cache)
+        attributes = ["zone_status", "zone_state"]
+        await self.get_attributes(attributes, from_cache=from_cache)
         await super().async_initialize(from_cache)

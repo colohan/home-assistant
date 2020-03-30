@@ -24,7 +24,6 @@ from homeassistant.const import (
 from homeassistant.exceptions import PlatformNotReady
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import Entity
-from homeassistant.util import Throttle
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,7 +34,7 @@ DEFAULT_PORT = 3493
 KEY_STATUS = "ups.status"
 KEY_STATUS_DISPLAY = "ups.status.display"
 
-MIN_TIME_BETWEEN_UPDATES = timedelta(seconds=60)
+SCAN_INTERVAL = timedelta(seconds=60)
 
 SENSOR_TYPES = {
     "ups.status.display": ["Status", "", "mdi:information-outline"],
@@ -166,9 +165,10 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up the NUT sensors."""
-    name = config.get(CONF_NAME)
-    host = config.get(CONF_HOST)
-    port = config.get(CONF_PORT)
+    name = config[CONF_NAME]
+    host = config[CONF_HOST]
+    port = config[CONF_PORT]
+
     alias = config.get(CONF_ALIAS)
     username = config.get(CONF_USERNAME)
     password = config.get(CONF_PASSWORD)
@@ -220,6 +220,8 @@ class NUTSensor(Entity):
         self._name = "{} {}".format(name, SENSOR_TYPES[sensor_type][0])
         self._unit = SENSOR_TYPES[sensor_type][1]
         self._state = None
+        self._display_state = None
+        self._available = False
 
     @property
     def name(self):
@@ -242,37 +244,43 @@ class NUTSensor(Entity):
         return self._unit
 
     @property
+    def available(self):
+        """Return if the device is polling successfully."""
+        return self._available
+
+    @property
     def device_state_attributes(self):
         """Return the sensor attributes."""
-        attr = dict()
-        attr[ATTR_STATE] = self.display_state()
-        return attr
-
-    def display_state(self):
-        """Return UPS display state."""
-        if self._data.status is None:
-            return STATE_TYPES["OFF"]
-        try:
-            return " ".join(
-                STATE_TYPES[state] for state in self._data.status[KEY_STATUS].split()
-            )
-        except KeyError:
-            return STATE_UNKNOWN
+        return {ATTR_STATE: self._display_state}
 
     def update(self):
         """Get the latest status and use it to update our sensor state."""
-        if self._data.status is None:
-            self._state = None
+        status = self._data.status
+
+        if status is None:
+            self._available = False
             return
 
+        self._available = True
+        self._display_state = _format_display_state(status)
         # In case of the display status sensor, keep a human-readable form
         # as the sensor state.
         if self.type == KEY_STATUS_DISPLAY:
-            self._state = self.display_state()
-        elif self.type not in self._data.status:
+            self._state = self._display_state
+        elif self.type not in status:
             self._state = None
         else:
-            self._state = self._data.status[self.type]
+            self._state = status[self.type]
+
+
+def _format_display_state(status):
+    """Return UPS display state."""
+    if status is None:
+        return STATE_TYPES["OFF"]
+    try:
+        return " ".join(STATE_TYPES[state] for state in status[KEY_STATUS].split())
+    except KeyError:
+        return STATE_UNKNOWN
 
 
 class PyNUTData:
@@ -325,7 +333,6 @@ class PyNUTData:
             _LOGGER.debug("Error getting NUT vars for host %s: %s", self._host, err)
             return None
 
-    @Throttle(MIN_TIME_BETWEEN_UPDATES)
     def update(self, **kwargs):
         """Fetch the latest status from NUT."""
         self._status = self._get_status()

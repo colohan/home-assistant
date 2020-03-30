@@ -39,6 +39,7 @@ class Channels:
         """Initialize instance."""
         self._pools: List[zha_typing.ChannelPoolType] = []
         self._power_config = None
+        self._identify = None
         self._semaphore = asyncio.Semaphore(3)
         self._unique_id = str(zha_device.ieee)
         self._zdo_channel = base.ZDOChannel(zha_device.device.endpoints[0], zha_device)
@@ -59,6 +60,17 @@ class Channels:
         """Power configuration channel setter."""
         if self._power_config is None:
             self._power_config = channel
+
+    @property
+    def identify_ch(self) -> zha_typing.ChannelType:
+        """Return power configuration channel."""
+        return self._identify
+
+    @identify_ch.setter
+    def identify_ch(self, channel: zha_typing.ChannelType) -> None:
+        """Power configuration channel setter."""
+        if self._identify is None:
+            self._identify = channel
 
     @property
     def semaphore(self) -> asyncio.Semaphore:
@@ -151,18 +163,23 @@ class ChannelPool:
         self._channels: Channels = channels
         self._claimed_channels: ChannelsDict = {}
         self._id: int = ep_id
-        self._relay_channels: Dict[str, zha_typing.EventRelayChannelType] = {}
+        self._client_channels: Dict[str, zha_typing.ClientChannelType] = {}
         self._unique_id: str = f"{channels.unique_id}-{ep_id}"
 
     @property
     def all_channels(self) -> ChannelsDict:
-        """All channels of an endpoint."""
+        """All server channels of an endpoint."""
         return self._all_channels
 
     @property
     def claimed_channels(self) -> ChannelsDict:
         """Channels in use."""
         return self._claimed_channels
+
+    @property
+    def client_channels(self) -> Dict[str, zha_typing.ClientChannelType]:
+        """Return a dict of client channels."""
+        return self._client_channels
 
     @property
     def endpoint(self) -> zha_typing.ZigpyEndpointType:
@@ -180,6 +197,11 @@ class ChannelPool:
         return self._channels.zha_device.nwk
 
     @property
+    def is_mains_powered(self) -> bool:
+        """Device is_mains_powered."""
+        return self._channels.zha_device.is_mains_powered
+
+    @property
     def manufacturer(self) -> Optional[str]:
         """Return device manufacturer."""
         return self._channels.zha_device.manufacturer
@@ -190,14 +212,14 @@ class ChannelPool:
         return self._channels.zha_device.manufacturer_code
 
     @property
+    def hass(self):
+        """Return hass."""
+        return self._channels.zha_device.hass
+
+    @property
     def model(self) -> Optional[str]:
         """Return device model."""
         return self._channels.zha_device.model
-
-    @property
-    def relay_channels(self) -> Dict[str, zha_typing.EventRelayChannelType]:
-        """Return a dict of event relay channels."""
-        return self._relay_channels
 
     @property
     def skip_configuration(self) -> bool:
@@ -214,7 +236,7 @@ class ChannelPool:
         """Create new channels for an endpoint."""
         pool = cls(channels, ep_id)
         pool.add_all_channels()
-        pool.add_relay_channels()
+        pool.add_client_channels()
         zha_disc.PROBE.discover_entities(pool)
         return pool
 
@@ -223,7 +245,7 @@ class ChannelPool:
         """Create and add channels for all input clusters."""
         for cluster_id, cluster in self.endpoint.in_clusters.items():
             channel_class = zha_regs.ZIGBEE_CHANNEL_REGISTRY.get(
-                cluster_id, base.AttributeListeningChannel
+                cluster_id, base.ZigbeeChannel
             )
             # really ugly hack to deal with xiaomi using the door lock cluster
             # incorrectly.
@@ -231,7 +253,7 @@ class ChannelPool:
                 hasattr(cluster, "ep_attribute")
                 and cluster.ep_attribute == "multistate_input"
             ):
-                channel_class = base.AttributeListeningChannel
+                channel_class = base.ZigbeeChannel
             # end of ugly hack
             channel = channel_class(cluster, self)
             if channel.name == const.CHANNEL_POWER_CONFIGURATION:
@@ -242,17 +264,19 @@ class ChannelPool:
                     # on power configuration channel per device
                     continue
                 self._channels.power_configuration_ch = channel
+            elif channel.name == const.CHANNEL_IDENTIFY:
+                self._channels.identify_ch = channel
 
             self.all_channels[channel.id] = channel
 
     @callback
-    def add_relay_channels(self) -> None:
-        """Create relay channels for all output clusters if in the registry."""
-        for cluster_id in zha_regs.EVENT_RELAY_CLUSTERS:
+    def add_client_channels(self) -> None:
+        """Create client channels for all output clusters if in the registry."""
+        for cluster_id, channel_class in zha_regs.CLIENT_CHANNELS_REGISTRY.items():
             cluster = self.endpoint.out_clusters.get(cluster_id)
             if cluster is not None:
-                channel = base.EventRelayChannel(cluster, self)
-                self.relay_channels[channel.id] = channel
+                channel = channel_class(cluster, self)
+                self.client_channels[channel.id] = channel
 
     async def async_initialize(self, from_cache: bool = False) -> None:
         """Initialize claimed channels."""
@@ -269,7 +293,7 @@ class ChannelPool:
             async with self._channels.semaphore:
                 return await coro
 
-        channels = [*self.claimed_channels.values(), *self.relay_channels.values()]
+        channels = [*self.claimed_channels.values(), *self.client_channels.values()]
         tasks = [_throttle(getattr(ch, func_name)(*args)) for ch in channels]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         for channel, outcome in zip(channels, results):
