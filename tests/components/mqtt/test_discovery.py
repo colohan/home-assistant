@@ -1,7 +1,6 @@
 """The tests for the MQTT discovery."""
 from pathlib import Path
 import re
-from unittest.mock import patch
 
 import pytest
 
@@ -13,10 +12,10 @@ from homeassistant.components.mqtt.abbreviations import (
 from homeassistant.components.mqtt.discovery import ALREADY_DISCOVERED, async_start
 from homeassistant.const import STATE_OFF, STATE_ON
 
+from tests.async_mock import AsyncMock, patch
 from tests.common import (
     MockConfigEntry,
     async_fire_mqtt_message,
-    mock_coro,
     mock_device_registry,
     mock_registry,
 )
@@ -51,32 +50,32 @@ async def test_subscribing_config_topic(hass, mqtt_mock):
 async def test_invalid_topic(hass, mqtt_mock):
     """Test sending to invalid topic."""
     with patch(
-        "homeassistant.components.mqtt.discovery.async_load_platform"
-    ) as mock_load_platform:
+        "homeassistant.components.mqtt.discovery.async_dispatcher_send"
+    ) as mock_dispatcher_send:
         entry = MockConfigEntry(
             domain=mqtt.DOMAIN, data={mqtt.CONF_BROKER: "test-broker"}
         )
 
-        mock_load_platform.return_value = mock_coro()
+        mock_dispatcher_send = AsyncMock(return_value=None)
         await async_start(hass, "homeassistant", {}, entry)
 
         async_fire_mqtt_message(
             hass, "homeassistant/binary_sensor/bla/not_config", "{}"
         )
         await hass.async_block_till_done()
-        assert not mock_load_platform.called
+        assert not mock_dispatcher_send.called
 
 
 async def test_invalid_json(hass, mqtt_mock, caplog):
     """Test sending in invalid JSON."""
     with patch(
-        "homeassistant.components.mqtt.discovery.async_load_platform"
-    ) as mock_load_platform:
+        "homeassistant.components.mqtt.discovery.async_dispatcher_send"
+    ) as mock_dispatcher_send:
         entry = MockConfigEntry(
             domain=mqtt.DOMAIN, data={mqtt.CONF_BROKER: "test-broker"}
         )
 
-        mock_load_platform.return_value = mock_coro()
+        mock_dispatcher_send = AsyncMock(return_value=None)
         await async_start(hass, "homeassistant", {}, entry)
 
         async_fire_mqtt_message(
@@ -84,30 +83,30 @@ async def test_invalid_json(hass, mqtt_mock, caplog):
         )
         await hass.async_block_till_done()
         assert "Unable to parse JSON" in caplog.text
-        assert not mock_load_platform.called
+        assert not mock_dispatcher_send.called
 
 
 async def test_only_valid_components(hass, mqtt_mock, caplog):
     """Test for a valid component."""
     with patch(
-        "homeassistant.components.mqtt.discovery.async_load_platform"
-    ) as mock_load_platform:
+        "homeassistant.components.mqtt.discovery.async_dispatcher_send"
+    ) as mock_dispatcher_send:
         entry = MockConfigEntry(domain=mqtt.DOMAIN)
 
         invalid_component = "timer"
 
-        mock_load_platform.return_value = mock_coro()
+        mock_dispatcher_send = AsyncMock(return_value=None)
         await async_start(hass, "homeassistant", {}, entry)
 
         async_fire_mqtt_message(
-            hass, "homeassistant/{}/bla/config".format(invalid_component), "{}"
+            hass, f"homeassistant/{invalid_component}/bla/config", "{}"
         )
 
     await hass.async_block_till_done()
 
-    assert "Integration {} is not supported".format(invalid_component) in caplog.text
+    assert f"Integration {invalid_component} is not supported" in caplog.text
 
-    assert not mock_load_platform.called
+    assert not mock_dispatcher_send.called
 
 
 async def test_correct_config_discovery(hass, mqtt_mock, caplog):

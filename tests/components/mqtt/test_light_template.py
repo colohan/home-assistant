@@ -26,7 +26,7 @@ If your light doesn't support white value feature, omit `white_value_template`.
 
 If your light doesn't support RGB feature, omit `(red|green|blue)_template`.
 """
-from unittest.mock import patch
+import pytest
 
 from homeassistant.components import light
 from homeassistant.const import (
@@ -38,7 +38,7 @@ from homeassistant.const import (
 import homeassistant.core as ha
 from homeassistant.setup import async_setup_component
 
-from .common import (
+from .test_common import (
     help_test_availability_without_topic,
     help_test_custom_availability_payload,
     help_test_default_availability_payload,
@@ -46,11 +46,13 @@ from .common import (
     help_test_discovery_removal,
     help_test_discovery_update,
     help_test_discovery_update_attr,
+    help_test_entity_debug_info_message,
     help_test_entity_device_info_remove,
     help_test_entity_device_info_update,
     help_test_entity_device_info_with_connection,
     help_test_entity_device_info_with_identifier,
-    help_test_entity_id_update,
+    help_test_entity_id_update_discovery_update,
+    help_test_entity_id_update_subscriptions,
     help_test_setting_attribute_via_mqtt_json_message,
     help_test_setting_attribute_with_template,
     help_test_unique_id,
@@ -58,7 +60,8 @@ from .common import (
     help_test_update_with_json_attrs_not_dict,
 )
 
-from tests.common import assert_setup_component, async_fire_mqtt_message, mock_coro
+from tests.async_mock import patch
+from tests.common import assert_setup_component, async_fire_mqtt_message
 from tests.components.light import common
 
 DEFAULT_CONFIG = {
@@ -285,7 +288,7 @@ async def test_sending_mqtt_commands_and_optimistic(hass, mqtt_mock):
 
     with patch(
         "homeassistant.helpers.restore_state.RestoreEntity.async_get_last_state",
-        return_value=mock_coro(fake_state),
+        return_value=fake_state,
     ):
         with assert_setup_component(1, light.DOMAIN):
             assert await async_setup_component(
@@ -900,6 +903,7 @@ async def test_discovery_update_light(hass, mqtt_mock, caplog):
     )
 
 
+@pytest.mark.no_fail_on_log_exception
 async def test_discovery_broken(hass, mqtt_mock, caplog):
     """Test handling of bad discovery message."""
     data1 = '{ "name": "Beer" }'
@@ -944,6 +948,53 @@ async def test_entity_device_info_remove(hass, mqtt_mock):
     )
 
 
-async def test_entity_id_update(hass, mqtt_mock):
+async def test_entity_id_update_subscriptions(hass, mqtt_mock):
     """Test MQTT subscriptions are managed when entity_id is updated."""
-    await help_test_entity_id_update(hass, mqtt_mock, light.DOMAIN, DEFAULT_CONFIG)
+    await help_test_entity_id_update_subscriptions(
+        hass, mqtt_mock, light.DOMAIN, DEFAULT_CONFIG
+    )
+
+
+async def test_entity_id_update_discovery_update(hass, mqtt_mock):
+    """Test MQTT discovery update when entity_id is updated."""
+    await help_test_entity_id_update_discovery_update(
+        hass, mqtt_mock, light.DOMAIN, DEFAULT_CONFIG
+    )
+
+
+async def test_entity_debug_info_message(hass, mqtt_mock):
+    """Test MQTT debug info."""
+    config = {
+        light.DOMAIN: {
+            "platform": "mqtt",
+            "schema": "template",
+            "name": "test",
+            "command_topic": "test-topic",
+            "command_on_template": "on,{{ transition }}",
+            "command_off_template": "off,{{ transition|d }}",
+            "state_template": '{{ value.split(",")[0] }}',
+        }
+    }
+    await help_test_entity_debug_info_message(hass, mqtt_mock, light.DOMAIN, config)
+
+
+async def test_max_mireds(hass, mqtt_mock):
+    """Test setting min_mireds and max_mireds."""
+    config = {
+        light.DOMAIN: {
+            "platform": "mqtt",
+            "schema": "template",
+            "name": "test",
+            "command_topic": "test_max_mireds/set",
+            "command_on_template": "on",
+            "command_off_template": "off",
+            "color_temp_template": "{{ value }}",
+            "max_mireds": 370,
+        }
+    }
+
+    assert await async_setup_component(hass, light.DOMAIN, config)
+
+    state = hass.states.get("light.test")
+    assert state.attributes.get("min_mireds") == 153
+    assert state.attributes.get("max_mireds") == 370

@@ -1,5 +1,4 @@
 """Configure py.test."""
-from asynctest import patch
 import pytest
 from pyvizio.const import DEVICE_CLASS_SPEAKER, MAX_VOLUME
 
@@ -8,7 +7,9 @@ from .const import (
     APP_LIST,
     CH_TYPE,
     CURRENT_APP_CONFIG,
+    CURRENT_EQ,
     CURRENT_INPUT,
+    EQ_LIST,
     INPUT_LIST,
     INPUT_LIST_WITH_APPS,
     MODEL,
@@ -18,6 +19,8 @@ from .const import (
     MockCompletePairingResponse,
     MockStartPairingResponse,
 )
+
+from tests.async_mock import patch
 
 
 class MockInput:
@@ -135,11 +138,15 @@ def vizio_update_fixture():
         "homeassistant.components.vizio.media_player.VizioAsync.can_connect_with_auth_check",
         return_value=True,
     ), patch(
-        "homeassistant.components.vizio.media_player.VizioAsync.get_all_audio_settings",
+        "homeassistant.components.vizio.media_player.VizioAsync.get_all_settings",
         return_value={
             "volume": int(MAX_VOLUME[DEVICE_CLASS_SPEAKER] / 2),
+            "eq": CURRENT_EQ,
             "mute": "Off",
         },
+    ), patch(
+        "homeassistant.components.vizio.media_player.VizioAsync.get_setting_options",
+        return_value=EQ_LIST,
     ), patch(
         "homeassistant.components.vizio.media_player.VizioAsync.get_current_input",
         return_value=CURRENT_INPUT,

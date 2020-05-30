@@ -2,9 +2,7 @@
 import asyncio
 from datetime import timedelta
 import logging
-from unittest.mock import MagicMock, Mock, patch
 
-import asynctest
 import pytest
 
 from homeassistant.const import UNIT_PERCENTAGE
@@ -18,6 +16,7 @@ from homeassistant.helpers.entity_component import (
 )
 import homeassistant.util.dt as dt_util
 
+from tests.async_mock import Mock, patch
 from tests.common import (
     MockConfigEntry,
     MockEntity,
@@ -136,7 +135,7 @@ async def test_update_state_adds_entities_with_update_before_add_false(hass):
     assert not ent.update.called
 
 
-@asynctest.patch("homeassistant.helpers.entity_platform.async_track_time_interval")
+@patch("homeassistant.helpers.entity_platform.async_track_time_interval")
 async def test_set_scan_interval_via_platform(mock_track, hass):
     """Test the setting of the scan interval via platform."""
 
@@ -168,7 +167,7 @@ async def test_adding_entities_with_generator_and_thread_callback(hass):
 
     def create_entity(number):
         """Create entity helper."""
-        entity = MockEntity()
+        entity = MockEntity(unique_id=f"unique{number}")
         entity.entity_id = async_generate_entity_id(DOMAIN + ".{}", "Number", hass=hass)
         return entity
 
@@ -183,13 +182,13 @@ async def test_platform_warn_slow_setup(hass):
 
     component = EntityComponent(_LOGGER, DOMAIN, hass)
 
-    with patch.object(hass.loop, "call_later", MagicMock()) as mock_call:
+    with patch.object(hass.loop, "call_later") as mock_call:
         await component.async_setup({DOMAIN: {"platform": "platform"}})
         assert mock_call.called
 
         # mock_calls[0] is the warning message for component setup
-        # mock_calls[3] is the warning message for platform setup
-        timeout, logger_method = mock_call.mock_calls[3][1][:2]
+        # mock_calls[5] is the warning message for platform setup
+        timeout, logger_method = mock_call.mock_calls[5][1][:2]
 
         assert timeout == entity_platform.SLOW_SETUP_WARNING
         assert logger_method == _LOGGER.warning
@@ -705,6 +704,7 @@ async def test_device_info_called(hass):
                         "model": "test-model",
                         "name": "test-name",
                         "sw_version": "test-sw",
+                        "entry_type": "service",
                         "via_device": ("hue", "via-id"),
                     },
                 ),
@@ -731,6 +731,7 @@ async def test_device_info_called(hass):
     assert device.model == "test-model"
     assert device.name == "test-name"
     assert device.sw_version == "test-sw"
+    assert device.entry_type == "service"
     assert device.via_device_id == via.id
 
 
